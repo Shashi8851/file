@@ -1,0 +1,432 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced File Transfer App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+        }
+        
+        .tab.active {
+            border-bottom: 2px solid #007bff;
+            color: #007bff;
+            margin-bottom: -2px;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .upload-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .file-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            background-color: #007bff;
+            color: white;
+            padding: 5px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-qr {
+            background-color: #28a745;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+        
+        .progress {
+            width: 0%;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        
+        #status {
+            margin-top: 10px;
+            color: #666;
+        }
+        
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            position: relative;
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            width: 300px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .close {
+            position: absolute;
+            right: 10px;
+            top: 5px;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        
+        .qr-container {
+            margin: 20px 0;
+        }
+        
+        #qrScanner {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enhanced File Transfer App</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('upload')">Upload & Files</button>
+            <button class="tab" onclick="showTab('history')">History</button>
+            <button class="tab" onclick="showTab('scanner')">QR Scanner</button>
+        </div>
+        
+        <div id="uploadTab" class="tab-content active">
+            <div class="upload-section" id="dropZone">
+                <h2>Upload File</h2>
+                <input type="file" id="fileInput" style="display: none">
+                <button class="btn" onclick="document.getElementById('fileInput').click()">Select File</button>
+                <p>or drag and drop files here</p>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress" id="progress"></div>
+                </div>
+                <div id="status"></div>
+            </div>
+            
+            <div class="files-section">
+                <h2>Available Files</h2>
+                <ul class="file-list">
+                    {% for file in files %}
+                    <li class="file-item">
+                        <span>{{ file }}</span>
+                        <div class="file-actions">
+                            <a href="{{ url_for('download_file', filename=file) }}" class="btn">Download</a>
+                            <button class="btn btn-qr" onclick="generateQR('{{ file }}')">QR Code</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        
+        <div id="historyTab" class="tab-content">
+            <h2>Transfer History</h2>
+            <div id="historyList">
+                {% for item in history %}
+                <div class="history-item">
+                    <strong>{{ item.filename }}</strong><br>
+                    Action: {{ item.action }}<br>
+                    Time: {{ item.timestamp }}<br>
+                    Size: {{ (item.size / 1024)|round(2) }} KB
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div id="scannerTab" class="tab-content">
+            <h2>QR Code Scanner</h2>
+            <p>Use your camera to scan a file's QR code for quick download</p>
+            <video id="qrScanner"></video>
+            <div id="scannerStatus"></div>
+        </div>
+    </div>
+    
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>QR Code</h2>
+            <p>Scan this code to download the file</p>
+            <div class="qr-container">
+                <img id="qrImage" src="" alt="QR Code" style="width: 100%">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script>
+        // Tab functionality
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // Initialize QR scanner if scanner tab is selected
+            if (tabName === 'scanner') {
+                initializeScanner();
+            }
+        }
+        
+        // File upload functionality
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progressBar = document.getElementById('progressBar');
+        const progress = document.getElementById('progress');
+        const status = document.getElementById('status');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('highlight');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('highlight');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFiles, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files: files } });
+        }
+
+        function handleFiles(e) {
+            const files = [...e.target.files];
+            uploadFiles(files);
+        }
+
+        function uploadFiles(files) {
+            files.forEach(uploadFile);
+        }
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            progressBar.style.display = 'block';
+            status.textContent = 'Uploading...';
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(result => {
+                status.textContent = 'Upload complete!';
+                progress.style.width = '100%';
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                    progress.style.width = '0%';
+                    window.location.reload();
+                }, 1000);
+            })
+            .catch(error => {
+                status.textContent = 'Upload failed';
+                console.error('Error:', error);
+            });
+        }
+
+        // QR Code functionality
+        function generateQR(filename) {
+            fetch(`/generate_qr/${filename}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('qrImage').src = `data:image/png;base64,${data.qr_code}`;
+                    document.getElementById('qrModal').style.display = 'block';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('qrModal')) {
+                closeModal();
+            }
+        }
+
+        // QR Scanner functionality
+        let html5QrcodeScanner = null;
+
+        function initializeScanner() {
+            if (html5QrcodeScanner === null)if (html5QrcodeScanner === null) {
+  html5QrcodeScanner = new Html5Qrcode("qrScanner");
+  
+  const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0
+  };
+  
+  html5QrcodeScanner.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      onScanFailure
+  );
+}
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+// Check if the URL is from our domain
+if (decodedText.startsWith(window.location.origin)) {
+document.getElementById('scannerStatus').innerHTML = 
+  `<p>QR Code detected! Starting download...</p>`;
+// Start the download
+window.location.href = decodedText;
+} else {
+document.getElementById('scannerStatus').innerHTML = 
+  `<p style="color: red;">Invalid QR code. Please scan a QR code generated by this application.</p>`;
+}
+}
+
+function onScanFailure(error) {
+// Handle scan failure
+console.warn(`QR scan failed = ${error}`);
+}
+
+// Add event listener for tab changes to stop scanner when switching tabs
+document.querySelectorAll('.tab').forEach(tab => {
+tab.addEventListener('click', function() {
+if (html5QrcodeScanner !== null && !this.classList.contains('scanner')) {
+  html5QrcodeScanner.stop().then(() => {
+      html5QrcodeScanner = null;
+  });
+}
+});
+});
+
+// Update history list periodically
+function updateHistory() {
+fetch('/history')
+.then(response => response.json())
+.then(history => {
+  const historyList = document.getElementById('historyList');
+  historyList.innerHTML = history.map(item => `
+      <div class="history-item">
+          <strong>${item.filename}</strong><br>
+          Action: ${item.action}<br>
+          Time: ${item.timestamp}<br>
+          Size: ${(item.size / 1024).toFixed(2)} KB
+      </div>
+  `).join('');
+});
+}
+
+// Update history every 30 seconds
+setInterval(updateHistory, 30000);
+</script>
+</body>
+</html>
